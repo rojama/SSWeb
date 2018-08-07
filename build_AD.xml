@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="AD" basedir="." default="makewar">
+	<property name="classpath_lib" value="${basedir}/WebContent/WEB-INF/lib" />
+	<property name="sources" value="${basedir}/src" />
+	<property name="difference" value="${basedir}/diff/${ant.project.name}" />
+	<property name="build" value="${basedir}/build/${ant.project.name}"></property>
+
+	<path id="classpath">
+		<fileset dir="${classpath_lib}">
+			<include name="*.jar" />
+		</fileset>
+	</path>
+
+	<property name="debuglevel" value="source,lines,vars" />
+	<property name="target" value="1.7" />
+	<property name="source" value="1.7" />
+
+	<target name="clean">
+		<delete dir="${build}" />
+		<delete file="${build}/../${ant.project.name}.war" />
+	</target>
+
+	<target name="init" depends="clean">
+		<mkdir dir="${build}" />
+		<mkdir dir="${build}/WEB-INF" />
+		<mkdir dir="${build}/WEB-INF/classes" />
+		<mkdir dir="${build}/WEB-INF/lib" />
+		<mkdir dir="${difference}" />
+	</target>
+
+	<target name="complie" depends="init">
+		<javac srcdir="${sources}" destdir="${build}/WEB-INF/classes"
+			encoding="utf-8" classpathref="classpath" includeAntRuntime="false">
+		</javac>
+		<copy todir="${build}/WEB-INF/classes" overwrite="true">
+			<fileset dir="${sources}">
+				<exclude name="**/*.java" />
+			</fileset>
+		</copy>
+		<copy todir="${build}" overwrite="true">
+			<fileset dir="${basedir}/WebContent">
+				<include name="**/*" />
+			</fileset>
+		</copy>
+		<copy todir="${build}" overwrite="true">
+			<fileset dir="${difference}">
+				<include name="**/*" />
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="makewar" depends="complie">
+		<war warfile="${build}/../${ant.project.name}.war" webxml="${build}/WEB-INF/web.xml">
+			<fileset dir="${build}" />
+		</war>
+	</target>
+
+</project>

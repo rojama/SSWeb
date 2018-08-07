@@ -1,0 +1,56 @@
+package com.app.help;
+
+import java.util.List;
+import java.util.Map;
+
+import com.app.sys.DB;
+
+public class OperationHelper {
+	
+	public String trimNull(Object str_valueObject) {
+		String str_value = (String) str_valueObject;
+		if (str_value == null) {
+			return "";
+		} else {
+			return str_value.trim();
+		}
+	}
+	
+	public String getLocale(String locale)
+	{
+		String myLocale="";
+		
+		if (("en-US").equals(locale)) {
+			myLocale = "OPE_ENGNAME";
+		} else if (("zh_CN").equals(locale)) {
+			myLocale = "OPE_NAME";
+		} else if (("zh_TW").equals(locale)) {
+			myLocale = "OPE_TWNAME";
+		} else {
+			myLocale = "OPE_NAME";
+		}
+		
+		return myLocale;
+	}
+	
+	/**
+	 * 查询所有操作
+	 * @return
+	 * @throws Exception
+	 */
+	public List<Map<String, Object>> findOperationData(String locale) throws Exception
+	{
+		String myLocale=getLocale(locale);
+		List<Map<String, Object>> list = DB.query("select OPE_ID, OPE_CODE,"+myLocale+" as NAME from AUT_OPERATION ");
+		
+		return list;
+	}
+	
+	public List<Map<String, Object>> findOperationData(Map<String, Object> map) throws Exception
+	{
+		 
+		List<Map<String, Object>> list = DB.query("select * from AUT_OPERATION ");
+		
+		return list;
+	}
+}
