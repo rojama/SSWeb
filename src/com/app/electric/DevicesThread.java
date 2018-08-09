@@ -17,8 +17,6 @@ import net.wimpi.modbus.util.BitVector;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.net.Socket;
 import java.net.SocketException;
@@ -27,6 +25,19 @@ import java.util.*;
 //设备线程
 public class DevicesThread extends Thread {
 	static ScriptEngine jse = new ScriptEngineManager().getEngineByName("JavaScript");
+	private static String ip = "127.0.0.1";
+	private static int port = 8850;
+	private static Socket socket = null;
+
+	static {
+		try {
+			ip = Machine.getPropertie("api.ip");
+			port = Integer.parseInt(Machine.getPropertie("api.port"));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
 	boolean iec103tcp_init = false;
 	private BoxThread processSocketData;
 	private String device_id;
@@ -38,19 +49,6 @@ public class DevicesThread extends Thread {
 	private int device_num;
 	private Map<String,Date> warningTimeRecord = new HashMap<String,Date>();  //key REGISTER_ID
 	private Map<String,Date> sendTimeRecord = new HashMap<String,Date>();  //key REGISTER_ID_(SMS/EMAIL)
-	private static String ip = "127.0.0.1";
-	private static int port = 8850;
-	private static Socket socket = null;
-
-	static {
-		try {
-			ip = Machine.getPropertie("api.ip");
-			port = Integer.parseInt(Machine.getPropertie("api.port"));
-			socket = new Socket(ip, port);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
 
 	public DevicesThread(BoxThread processSocketData, Map<String, Object> device) throws Exception {
 		this.processSocketData = processSocketData;
@@ -63,6 +61,60 @@ public class DevicesThread extends Thread {
 
 	}
 
+	//api发送给其它系统
+//			字段	字段名	字段说明	举例
+//			device_id	设备编号	每一个采集器的唯一编号	T0001
+//			device_name	设备名称	采集器的别称	发电机1采集器
+//			register_id	探头类型	同一型号采集器的探头类型	HWWD：红外温度  ZDL：震动量
+//			record_time	采集时间	时间格式yyyy-MM-dd HH:mm:ss	2018-07-26 09:38:02
+//			record_data	采集数据	采集数据内容	27.5
+//			register_unit	数据单位	采集数据单位	°C
+//			level_id	预警级别	如果超过警戒点，根据设置的级别进行判断，如果没有预警此处传空	L1：一级预警L2：二级预警L3：三级预警
+//			举例：
+//			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&L1
+//			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&
+	public static synchronized void sendApi(Map<String, Object> data) throws IOException {
+		try {
+			StringBuffer senddata = new StringBuffer();
+			senddata.append(data.get("DEVICE_ID") + "&");
+			senddata.append(data.get("DEVICE_NAME") + "&");
+			senddata.append(data.get("REGISTER_ID") + "&");
+			senddata.append(data.get("RECORD_TIME") + "&");
+			senddata.append(data.get("RECORD_DATA") + "&");
+			senddata.append(data.get("REGISTER_UNIT") + "&");
+			senddata.append(data.get("LEVEL_ID") + "\n");
+
+			ServerSocketListener.pushClient.sendMessage(senddata.toString());
+
+//			if (socket == null){
+//				System.out.println("new socket!!!!!!!!!");
+//				socket = new Socket(ip, port);
+//			}
+//
+//			try {//发送检测是否断开
+//				socket.sendUrgentData(0xFF);
+//			} catch (IOException e) {//断开产生异常，关闭对象
+//				System.out.println("new socket!!!!!!!!!");
+//				socket = new Socket(ip, port);
+//				e.printStackTrace();
+//			}
+//
+//			System.out.println(senddata.toString());
+//
+//			OutputStream outputStream=socket.getOutputStream();//获取一个输出流，向服务端发送信息
+//			PrintWriter printWriter=new PrintWriter(outputStream);//将输出流包装成打印流
+//			printWriter.println(senddata);
+//			printWriter.flush();
+//			outputStream.flush();
+//			System.out.println("send ok !!!!!!!!!");
+		} catch (Exception e) {
+			e.printStackTrace();
+			if (socket != null) {
+				socket.close();
+			}
+		}
+	}
+	
 	public void run() {
 		try {
 			Map<String, Object> where = new HashMap<String, Object>();
@@ -144,7 +196,6 @@ public class DevicesThread extends Thread {
 		}
 	}
 	
-	
 	public String readMODBUSTCP(Map<String, Object> register) throws Exception{
 		String record_data = "";
 		switch ((Integer) register.get("REGISTER_TYPE")) {
@@ -177,11 +228,11 @@ public class DevicesThread extends Thread {
 			readMultipleRegistersRequest.setReference((Integer) register.get("REGISTER_ADDRESS"));
 			readMultipleRegistersRequest.setWordCount((Integer) register.get("REGISTER_LENGTH"));
 			ReadMultipleRegistersResponse readMultipleRegistersResponse = (ReadMultipleRegistersResponse) processSocketData
-					.sendMessage(readMultipleRegistersRequest);								
+					.sendMessage(readMultipleRegistersRequest);
 			Register[] readMultipleRegisters = readMultipleRegistersResponse.getRegisters();
 			for (Register outRegister:readMultipleRegisters){
 				record_data += outRegister.getValue() + " ";
-			}								
+			}
 			break;
 		case 4:
 			ReadInputRegistersRequest readInputRegistersRequest = new ReadInputRegistersRequest();
@@ -198,7 +249,7 @@ public class DevicesThread extends Thread {
 		}
 		return record_data;
 	}
-	
+
 	public String writeMODBUSTCP(Map<String, Object> register) throws Exception{
 		String record_data = "";
 		String register_value = (String) register.get("REGISTER_VALUE");
@@ -219,8 +270,8 @@ public class DevicesThread extends Thread {
 			writeSingleRegisterRequest.setReference((Integer) register.get("REGISTER_ADDRESS"));
 			writeSingleRegisterRequest.setRegister(new SimpleRegister(Integer.parseInt(register_value)));
 			WriteSingleRegisterResponse writeSingleRegisterResponse = (WriteSingleRegisterResponse) processSocketData
-					.sendMessage(writeSingleRegisterRequest);	
-			record_data	= String.valueOf(writeSingleRegisterResponse.getRegisterValue());							
+					.sendMessage(writeSingleRegisterRequest);
+			record_data = String.valueOf(writeSingleRegisterResponse.getRegisterValue());
 			break;
 		case 4:
 			throw new Exception("不支持的寄存器类型!");
@@ -239,7 +290,7 @@ public class DevicesThread extends Thread {
 			data.put("REGISTER_ID", register.get("REGISTER_ID"));
 			data.put("REGISTER_UNIT", register.get("REGISTER_UNIT"));
 			data.put("RECORD_TIME", Machine.getSystemDateTime().get("SystemDateTime"));
-
+			String maxLevel = "";
 			//预警
 			try{
 				//单一数值处理
@@ -269,8 +320,7 @@ public class DevicesThread extends Thread {
 				if (warning){
 					data.putAll(register);
 					WebSocketManager.SendMessage("ELE_WARNING", null, JsonUtil.object2json(data));
-					String maxLevel = sendWarning(data);
-					data.put("LEVEL_ID", maxLevel);
+					maxLevel = sendWarning(data);
 					warningTimeRecord.put((String) register.get("REGISTER_ID"), new Date());
 				}else{
 					warningTimeRecord.remove(register.get("REGISTER_ID"));
@@ -279,53 +329,16 @@ public class DevicesThread extends Thread {
 
 			}
 
+			data.put("LEVEL_ID", maxLevel);
 			data.put("RECORD_DATA", record_data);
 
 			//api发送给其它系统
-			sendApi(data);
+			DevicesThread.sendApi(data);
 
 			//记录数据库
 			DB.insert("ELE_REGISTER_RECORD", data );
 			WebSocketManager.SendMessage("ELE_DEV_" + device_id, null, JsonUtil.object2json(data));
 
-		}
-	}
-
-	//api发送给其它系统
-//			字段	字段名	字段说明	举例
-//			device_id	设备编号	每一个采集器的唯一编号	T0001
-//			device_name	设备名称	采集器的别称	发电机1采集器
-//			register_id	探头类型	同一型号采集器的探头类型	HWWD：红外温度  ZDL：震动量
-//			record_time	采集时间	时间格式yyyy-MM-dd HH:mm:ss	2018-07-26 09:38:02
-//			record_data	采集数据	采集数据内容	27.5
-//			register_unit	数据单位	采集数据单位	°C
-//			level_id	预警级别	如果超过警戒点，根据设置的级别进行判断，如果没有预警此处传空	L1：一级预警L2：二级预警L3：三级预警
-//			举例：
-//			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&L1
-//			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&
-	private static synchronized void sendApi(Map<String, Object> data) throws IOException {
-		try {
-			StringBuffer senddata = new StringBuffer();
-			senddata.append(data.get("DEVICE_ID")+"&");
-			senddata.append(data.get("DEVICE_NAME")+"&");
-			senddata.append(data.get("REGISTER_ID")+"&");
-			senddata.append(data.get("RECORD_TIME")+"&");
-			senddata.append(data.get("RECORD_DATA")+"&");
-			senddata.append(data.get("REGISTER_UNIT")+"&");
-			senddata.append(data.get("LEVEL_ID"));
-
-			if (socket == null || socket.isClosed() || socket.isOutputShutdown()){
-				socket = new Socket(ip, port);
-			}
-
-			OutputStream outputStream=socket.getOutputStream();//获取一个输出流，向服务端发送信息
-			PrintWriter printWriter=new PrintWriter(outputStream);//将输出流包装成打印流
-			printWriter.println(senddata);
-		} catch (Exception e) {
-			e.printStackTrace();
-			if (socket != null){
-				socket.close();
-			}
 		}
 	}
 
