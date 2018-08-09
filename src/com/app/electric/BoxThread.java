@@ -26,7 +26,8 @@ import net.wimpi.modbus.net.*;
 
 public class BoxThread extends Thread {
 	public Socket socket;
-	private String boxID;
+	public String boxID;
+	public String boxName;
 	private ModbusTransport mt;
 	public volatile boolean exit = false; 
 	public Map<String, DevicesThread> devicesThreads = new HashMap<String, DevicesThread>(); // key device_id
@@ -88,6 +89,7 @@ public class BoxThread extends Thread {
 			List<Map<String, Object>> datas = DB.seleteByColumn("ELE_BOX", where);
 			if (datas.size() == 1) {
 				boxID = (String) datas.get(0).get("BOX_ID");
+				boxName = (String) datas.get(0).get("BOX_NAME");
 				if (ElectricManager.boxsSockets.containsKey(boxID)){
 					System.out.println("Client box "+boxID+" already connect");
 					//表示上一个连接已经失效，重新连接，所以盒子编号不能设置为一样的，防止两个盒子互相抢资源
