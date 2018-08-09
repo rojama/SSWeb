@@ -66,7 +66,7 @@
 				}},
 	    		{ display: "盒子名称",name:"BOX_NAME",type:"text",validate:{required:true}},
 	    		{ display: "连接端口",name:"CONNECT_PORT",type:"int",validate:{required:true, min:1024, max:65535}},
-	    		{ display: "盒子设备号",name:"BOX_NUM",type:"int",validate:{required:true, min:0}}  
+	    		{ display: "盒子设备号",name:"BOX_NUM",type:"text",validate:{required:true}}
 	    	],
 	    	buttons:[{text:"确认",click: doAction}]
 	    });

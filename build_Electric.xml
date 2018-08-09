@@ -31,7 +31,7 @@
 
 	<target name="complie" depends="init">
 		<javac srcdir="${sources}" destdir="${build}/WEB-INF/classes"
-			encoding="utf-8" classpathref="classpath" includeAntRuntime="false">
+			encoding="utf-8" classpathref="classpath" includeAntRuntime="false" debuglevel="lines">
 		</javac>
 		<copy todir="${build}/WEB-INF/classes" overwrite="true">
 			<fileset dir="${sources}">

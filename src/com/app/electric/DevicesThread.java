@@ -16,7 +16,11 @@ import net.wimpi.modbus.util.BitVector;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.math.BigDecimal;
+import java.net.Socket;
 import java.net.SocketException;
 import java.util.*;
 
@@ -34,8 +38,21 @@ public class DevicesThread extends Thread {
 	private int device_num;
 	private Map<String,Date> warningTimeRecord = new HashMap<String,Date>();  //key REGISTER_ID
 	private Map<String,Date> sendTimeRecord = new HashMap<String,Date>();  //key REGISTER_ID_(SMS/EMAIL)
+	private static String ip = "127.0.0.1";
+	private static int port = 8850;
+	private static Socket socket = null;
 
-	public DevicesThread(BoxThread processSocketData, Map<String, Object> device) {
+	static {
+		try {
+			ip = Machine.getPropertie("api.ip");
+			port = Integer.parseInt(Machine.getPropertie("api.port"));
+			socket = new Socket(ip, port);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public DevicesThread(BoxThread processSocketData, Map<String, Object> device) throws Exception {
 		this.processSocketData = processSocketData;
 		device_id = (String) device.get("DEVICE_ID");
 		device_name = (String) device.get("DEVICE_NAME");
@@ -43,6 +60,7 @@ public class DevicesThread extends Thread {
 		device_type_id = (String) device.get("DEVICE_TYPE_ID");
 		break_second = (Integer) device.get("BREAK_SECOND");
 		device_num = (Integer) device.get("DEVICE_NUM");
+
 	}
 
 	public void run() {
@@ -217,7 +235,9 @@ public class DevicesThread extends Thread {
 		if (!record_data.isEmpty() && !record_data.equals(register.get("REGISTER_ERR"))){
 			Map<String, Object> data = new HashMap<String, Object>();
 			data.put("DEVICE_ID", device_id);
+			data.put("DEVICE_NAME", device_name);
 			data.put("REGISTER_ID", register.get("REGISTER_ID"));
+			data.put("REGISTER_UNIT", register.get("REGISTER_UNIT"));
 			data.put("RECORD_TIME", Machine.getSystemDateTime().get("SystemDateTime"));
 
 			//预警
@@ -249,7 +269,8 @@ public class DevicesThread extends Thread {
 				if (warning){
 					data.putAll(register);
 					WebSocketManager.SendMessage("ELE_WARNING", null, JsonUtil.object2json(data));
-					sendWarning(data);
+					String maxLevel = sendWarning(data);
+					data.put("LEVEL_ID", maxLevel);
 					warningTimeRecord.put((String) register.get("REGISTER_ID"), new Date());
 				}else{
 					warningTimeRecord.remove(register.get("REGISTER_ID"));
@@ -259,22 +280,74 @@ public class DevicesThread extends Thread {
 			}
 
 			data.put("RECORD_DATA", record_data);
+
+			//api发送给其它系统
+			sendApi(data);
+
+			//记录数据库
 			DB.insert("ELE_REGISTER_RECORD", data );
 			WebSocketManager.SendMessage("ELE_DEV_" + device_id, null, JsonUtil.object2json(data));
+
 		}
 	}
 
-	private void sendWarning(Map<String, Object> data) {
+	//api发送给其它系统
+//			字段	字段名	字段说明	举例
+//			device_id	设备编号	每一个采集器的唯一编号	T0001
+//			device_name	设备名称	采集器的别称	发电机1采集器
+//			register_id	探头类型	同一型号采集器的探头类型	HWWD：红外温度  ZDL：震动量
+//			record_time	采集时间	时间格式yyyy-MM-dd HH:mm:ss	2018-07-26 09:38:02
+//			record_data	采集数据	采集数据内容	27.5
+//			register_unit	数据单位	采集数据单位	°C
+//			level_id	预警级别	如果超过警戒点，根据设置的级别进行判断，如果没有预警此处传空	L1：一级预警L2：二级预警L3：三级预警
+//			举例：
+//			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&L1
+//			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&
+	private static synchronized void sendApi(Map<String, Object> data) throws IOException {
 		try {
-			List<Map<String, Object>> level_ids = checkWarningLevel(data);
-			if (level_ids.isEmpty()) return;
+			StringBuffer senddata = new StringBuffer();
+			senddata.append(data.get("DEVICE_ID")+"&");
+			senddata.append(data.get("DEVICE_NAME")+"&");
+			senddata.append(data.get("REGISTER_ID")+"&");
+			senddata.append(data.get("RECORD_TIME")+"&");
+			senddata.append(data.get("RECORD_DATA")+"&");
+			senddata.append(data.get("REGISTER_UNIT")+"&");
+			senddata.append(data.get("LEVEL_ID"));
+
+			if (socket == null || socket.isClosed() || socket.isOutputShutdown()){
+				socket = new Socket(ip, port);
+			}
+
+			OutputStream outputStream=socket.getOutputStream();//获取一个输出流，向服务端发送信息
+			PrintWriter printWriter=new PrintWriter(outputStream);//将输出流包装成打印流
+			printWriter.println(senddata);
+		} catch (Exception e) {
+			e.printStackTrace();
+			if (socket != null){
+				socket.close();
+			}
+		}
+	}
+
+	private String sendWarning(Map<String, Object> data) {
+		List<Map<String, Object>> level_ids = checkWarningLevel(data);
+
+		//判断最大的level
+		String level = "";
+		for (Map<String, Object> level_id : level_ids) {
+			level = (String) level_id.get("LEVEL_ID");
+			break;
+		}
+
+		try {
+			if (level_ids.isEmpty()) return level;
 
 			List<Map<String, Object>> treeDatas = DB.query("select concat('ARE_',area_id) as node_id, area_name as node_name, case when upper_area_id='' then '' else concat('ARE_',upper_area_id) end as upper_node_id from ele_area union "
 					+ "select concat('BOX_',box_id), box_name,concat('ARE_',area_id) from ele_box union "
 					+ "select concat('DEV_',device_id), device_name, concat('BOX_',box_id) from ele_device");
 			String device_id = (String) data.get("DEVICE_ID");
 			List<String> node_ids = getUpperNodeId(treeDatas, "DEV_"+device_id);
-			if (node_ids.isEmpty()) return;
+			if (node_ids.isEmpty()) return level;
 
 			for (Map<String, Object> level_id : level_ids) {
 				for (String node_id : node_ids) {
@@ -328,6 +401,7 @@ public class DevicesThread extends Thread {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		return level;
 	}
 	
 	private String changeWarningMessage(Map<String, Object> data) throws Exception {

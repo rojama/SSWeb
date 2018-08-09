@@ -17,6 +17,8 @@ import javax.servlet.ServletContext;
 import com.app.electric.iecrole.IEC104APDU;
 import com.app.sys.DB;
 
+import com.app.utility.DataTypeChangeHelper;
+import net.wimpi.modbus.ModbusIOException;
 import net.wimpi.modbus.io.ModbusTransport;
 import net.wimpi.modbus.msg.ModbusMessage;
 import net.wimpi.modbus.msg.ModbusResponse;
@@ -55,17 +57,25 @@ public class BoxThread extends Thread {
 		int connect_port = socket.getLocalPort();
 		System.out.println("Client connection accepted");
 		System.out.println("Reading box_num...");
-		int box_num = 0;
+		String box_num ="";
 		try {
 			// 获取盒子编号，要求配置盒子连接后首先发送盒子编号
-			byte[] b = new byte[4];
+			byte[] b = new byte[6];
 			socket.setSoTimeout(10000);
-			if (socket.getInputStream().read(b) != -1) {
+			int len = socket.getInputStream().read(b);
+
+            System.out.println("Read Box data:"+DataTypeChangeHelper.bytesToHexString(b));
+
+			if (len == 4) {  // 自定义数字，带校验
 				if (b[0] == ~b[2] && b[1] == ~b[3]) {
-					box_num = (((b[0] & 0xFF) << 8) | (b[1] & 0xFF));
+					box_num = String.valueOf(((b[0] & 0xFF) << 8) | (b[1] & 0xFF));
 				}
+			}else if (len == 6) {  // Mac 地址
+				box_num = DataTypeChangeHelper.bytesToHexString(b);
+				box_num = box_num.substring(8,12); //只判断后4位
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
 			System.err.println("Read box_num timed out");
 		}
 		try {
@@ -124,7 +134,12 @@ public class BoxThread extends Thread {
 			TCPSlaveConnection tc = new TCPSlaveConnection(socket);
 			mt = tc.getModbusTransport();
 		}
-		mt.writeMessage(msg);
+		try {
+			mt.writeMessage(msg);
+		} catch (ModbusIOException e) {  //无法写数据，表示盒子已经断开连接，需要关闭盒子进程
+			e.printStackTrace();
+			this.close();
+		}
 		return mt.readResponse();
 	}
 	
