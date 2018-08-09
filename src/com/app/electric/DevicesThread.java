@@ -73,7 +73,7 @@ public class DevicesThread extends Thread {
 //			举例：
 //			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&L1
 //			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&
-	public static synchronized void sendApi(Map<String, Object> data) throws IOException {
+	public void sendApi(Map<String, Object> data) throws IOException {
 		try {
 			StringBuffer senddata = new StringBuffer();
 			senddata.append(data.get("DEVICE_ID") + "&");
@@ -85,28 +85,6 @@ public class DevicesThread extends Thread {
 			senddata.append(data.get("LEVEL_ID") + "\n");
 
 			ServerSocketListener.pushClient.sendMessage(senddata.toString());
-
-//			if (socket == null){
-//				System.out.println("new socket!!!!!!!!!");
-//				socket = new Socket(ip, port);
-//			}
-//
-//			try {//发送检测是否断开
-//				socket.sendUrgentData(0xFF);
-//			} catch (IOException e) {//断开产生异常，关闭对象
-//				System.out.println("new socket!!!!!!!!!");
-//				socket = new Socket(ip, port);
-//				e.printStackTrace();
-//			}
-//
-//			System.out.println(senddata.toString());
-//
-//			OutputStream outputStream=socket.getOutputStream();//获取一个输出流，向服务端发送信息
-//			PrintWriter printWriter=new PrintWriter(outputStream);//将输出流包装成打印流
-//			printWriter.println(senddata);
-//			printWriter.flush();
-//			outputStream.flush();
-//			System.out.println("send ok !!!!!!!!!");
 		} catch (Exception e) {
 			e.printStackTrace();
 			if (socket != null) {
@@ -333,7 +311,7 @@ public class DevicesThread extends Thread {
 			data.put("RECORD_DATA", record_data);
 
 			//api发送给其它系统
-			DevicesThread.sendApi(data);
+			sendApi(data);
 
 			//记录数据库
 			DB.insert("ELE_REGISTER_RECORD", data );
