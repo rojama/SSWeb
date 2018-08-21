@@ -18,21 +18,24 @@ public class PushClient {
 
     Logger logger = Logger.getLogger("PushClient");
 
-    private String host;
-
-    private Integer port;
-
     private Socket client;
+    private Socket clientSupply;
 
     private OutputStream os;
+    private OutputStream osSupply;
 
     private LinkedList<Object> msgList = new LinkedList<Object>();
+    private LinkedList<Object> msgListSupply = new LinkedList<Object>();
 
     private Thread sendMessageThread;
+    private Thread sendMessageThreadSupply;
+
+    private PushClient content;
 
 
     public PushClient() {
         super();
+        content = this;
         logger.info("\n\n############# 加载PushClient\n");
         sendMessageThread = new Thread(new Runnable() {
 
@@ -43,17 +46,15 @@ public class PushClient {
                         if (null != client) {
                             if (msgList.size() == 0) {
                                 Thread.sleep(3000);
-                                //logger.info("待发送的消息条数为0\n");
                                 continue;
                             }
                             //logger.info("待发送的消息条数："+msgList.size()+"\n");
-                            for (int i = 0; i < msgList.size(); i++) {
-                                //Thread.sleep(500);
-                                logger.info("发送第" + (i + 1) + "条消息:" + msgList.get(i).toString());
-                                os.write(msgList.get(i).toString().getBytes());
+                            Object msg;
+                            while ((msg = content.getMsg()) != null){
+                                logger.info("发送消息:" + msg.toString());
+                                os.write(msg.toString().getBytes());
                                 os.flush();
                             }
-                            msgList.clear();
                         } else {
                             logger.info("\n\n重新连接中...\n");
                             String push_ip = Machine.getPropertie("api.ip");
@@ -69,6 +70,12 @@ public class PushClient {
                                 client.close();
                                 client = null;
                             }
+
+                            //transfer to supply linked list
+                            Object msg;
+                            while ((msg = content.getMsg()) != null){
+                                content.addSupplyMsg(msg);
+                            }
                             logger.info("\n\n连接失败，继续连接\n");
                             Thread.sleep(10 * 1000);
                         } catch (Exception e1) {
@@ -80,6 +87,51 @@ public class PushClient {
         });
         sendMessageThread.start();
 
+
+        sendMessageThreadSupply = new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        if (null != clientSupply) {
+                            if (msgListSupply.size() == 0) {
+                                Thread.sleep(3000);
+                                continue;
+                            }
+                            //logger.info("待发送的消息条数："+msgList.size()+"\n");
+                            Object msg;
+                            while ((msg = content.getSupplyMsg()) != null){
+                                logger.info("发送补发消息:" + msg.toString());
+                                osSupply.write(msg.toString().getBytes());
+                                osSupply.flush();
+                            }
+                        } else {
+                            logger.info("\n\n重新补发连接中...\n");
+                            String push_ip = Machine.getPropertie("api.ip");
+                            Integer push_port = Integer.parseInt(Machine.getPropertie("api.port.supply"));
+                            logger.info("\n\n补发连接IP:" + push_ip + "\n补发连接PORT:" + push_port);
+                            clientSupply = new Socket(push_ip, push_port);
+                            clientSupply.setKeepAlive(true);
+                            osSupply = clientSupply.getOutputStream();
+                        }
+                    } catch (Exception e) {
+                        try {
+                            if (clientSupply != null) {
+                                clientSupply.close();
+                                clientSupply = null;
+                            }
+                            logger.info("\n\n补发连接失败，继续连接\n");
+                            Thread.sleep(10 * 1000);
+                        } catch (Exception e1) {
+                            e1.printStackTrace();
+                        }
+                    }
+                }
+            }
+        });
+        sendMessageThreadSupply.start();
+
         //定时清理数据
         new Thread(new Runnable() {
 
@@ -88,7 +140,7 @@ public class PushClient {
                 while (true) {
                     try {
                         Thread.sleep(3600 * 1000);
-                        DB.update("delete from ele_register_record where record_time  <  (CURRENT_TIMESTAMP() + INTERVAL -1 DAY)");
+                        DB.update("delete from ele_register_record where record_time  <  (CURRENT_TIMESTAMP() + INTERVAL -30 DAY)");
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -130,6 +182,20 @@ public class PushClient {
     }
 
     /**
+     * 出
+     *
+     * @return
+     */
+    public Object getSupplyMsg() {
+        synchronized (this) {
+            if (msgListSupply != null && msgListSupply.size() > 0) {
+                return msgListSupply.removeFirst();
+            }
+            return null;
+        }
+    }
+
+    /**
      * 入
      *
      * @param obj
@@ -138,6 +204,22 @@ public class PushClient {
     public Object addMsg(Object obj) {
         synchronized (this) {
             msgList.addLast(obj);
+        }
+        return obj;
+    }
+
+    /**
+     * 入
+     *
+     * @param obj
+     * @return
+     */
+    public Object addSupplyMsg(Object obj) {
+        synchronized (this) {
+            msgListSupply.addLast(obj);
+            if (msgListSupply.size() > 100000){
+                msgListSupply.removeFirst();
+            }
         }
         return obj;
     }
@@ -157,22 +239,6 @@ public class PushClient {
 
     public void setLogger(Logger logger) {
         this.logger = logger;
-    }
-
-    public String getHost() {
-        return host;
-    }
-
-    public void setHost(String host) {
-        this.host = host;
-    }
-
-    public Integer getPort() {
-        return port;
-    }
-
-    public void setPort(Integer port) {
-        this.port = port;
     }
 
     public Socket getClient() {

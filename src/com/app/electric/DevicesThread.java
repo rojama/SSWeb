@@ -62,35 +62,39 @@ public class DevicesThread extends Thread {
 	}
 
 	//api发送给其它系统
-//			字段	字段名	字段说明	举例
-//			device_id	设备编号	每一个采集器的唯一编号	T0001
-//			device_name	设备名称	采集器的别称	发电机1采集器
-//			register_id	探头类型	同一型号采集器的探头类型	HWWD：红外温度  ZDL：震动量
-//			record_time	采集时间	时间格式yyyy-MM-dd HH:mm:ss	2018-07-26 09:38:02
-//			record_data	采集数据	采集数据内容	27.5
-//			register_unit	数据单位	采集数据单位	°C
-//			level_id	预警级别	如果超过警戒点，根据设置的级别进行判断，如果没有预警此处传空	L1：一级预警L2：二级预警L3：三级预警
-//			举例：
-//			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&L1
-//			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&
 	public void sendApi(Map<String, Object> data) throws IOException {
 		try {
-			StringBuffer senddata = new StringBuffer();
-			senddata.append(data.get("DEVICE_ID") + "&");
-			senddata.append(data.get("DEVICE_NAME") + "&");
-			senddata.append(data.get("REGISTER_ID") + "&");
-			senddata.append(data.get("RECORD_TIME") + "&");
-			senddata.append(data.get("RECORD_DATA") + "&");
-			senddata.append(data.get("REGISTER_UNIT") + "&");
-			senddata.append(data.get("LEVEL_ID") + "\n");
-
-			ServerSocketListener.pushClient.sendMessage(senddata.toString());
+			ServerSocketListener.pushClient.sendMessage(makeApiData(data));
 		} catch (Exception e) {
 			e.printStackTrace();
 			if (socket != null) {
 				socket.close();
 			}
 		}
+	}
+
+	//组合数据
+	//			字段	字段名	字段说明	举例
+	//			device_id	设备编号	每一个采集器的唯一编号	T0001
+	//			device_name	设备名称	采集器的别称	发电机1采集器
+	//			register_id	探头类型	同一型号采集器的探头类型	HWWD：红外温度  ZDL：震动量
+	//			record_time	采集时间	时间格式yyyy-MM-dd HH:mm:ss	2018-07-26 09:38:02
+	//			record_data	采集数据	采集数据内容	27.5
+	//			register_unit	数据单位	采集数据单位	°C
+	//			level_id	预警级别	如果超过警戒点，根据设置的级别进行判断，如果没有预警此处传空	L1：一级预警L2：二级预警L3：三级预警
+	//			举例：
+	//			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&L1
+	//			T0001&发电机1采集器&HWWD&2018-07-26 09:38:02&27.5&°C&
+	static public String makeApiData(Map<String, Object> data){
+		StringBuffer senddata = new StringBuffer();
+		senddata.append(data.get("DEVICE_ID") + "&");
+		senddata.append(data.get("DEVICE_NAME") + "&");
+		senddata.append(data.get("REGISTER_ID") + "&");
+		senddata.append(data.get("RECORD_TIME") + "&");
+		senddata.append(data.get("RECORD_DATA") + "&");
+		senddata.append(data.get("REGISTER_UNIT") + "&");
+		senddata.append(data.get("LEVEL_ID") + "\n");
+		return senddata.toString();
 	}
 	
 	public void run() {
