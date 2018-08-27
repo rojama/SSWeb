@@ -20,6 +20,7 @@ import com.app.sys.DB;
 import com.app.utility.DataTypeChangeHelper;
 import net.wimpi.modbus.ModbusIOException;
 import net.wimpi.modbus.io.ModbusTransport;
+import net.wimpi.modbus.io.ModbusUDPTransport;
 import net.wimpi.modbus.msg.ModbusMessage;
 import net.wimpi.modbus.msg.ModbusResponse;
 import net.wimpi.modbus.net.*;
@@ -29,6 +30,7 @@ public class BoxThread extends Thread {
 	public String boxID;
 	public String boxName;
 	private ModbusTransport mt;
+	private ModbusRTUTranTCP mrt;
 	public volatile boolean exit = false; 
 	public Map<String, DevicesThread> devicesThreads = new HashMap<String, DevicesThread>(); // key device_id
 	public BoxThread() {
@@ -131,7 +133,7 @@ public class BoxThread extends Thread {
 	}	
 
 	// 盒子连接是半双工的需要排队发送数据(MODBUS TCP)
-	public synchronized ModbusResponse sendMessage(ModbusMessage msg) throws Exception {
+	public ModbusResponse sendTCPMessage(ModbusMessage msg) throws Exception {
 		if (mt == null){
 			TCPSlaveConnection tc = new TCPSlaveConnection(socket);
 			mt = tc.getModbusTransport();
@@ -143,6 +145,30 @@ public class BoxThread extends Thread {
 			this.close();
 		}
 		return mt.readResponse();
+	}
+
+	// 盒子连接是半双工的需要排队发送数据(MODBUS RTU)
+	public ModbusResponse sendRTUMessage(ModbusMessage msg) throws Exception {
+		if (mrt == null){
+			mrt = new ModbusRTUTranTCP();
+			mrt.prepareStreams(socket.getInputStream(),socket.getOutputStream());
+		}
+		try {
+			mrt.writeMessage(msg);
+		} catch (ModbusIOException e) {  //无法写数据，表示盒子已经断开连接，需要关闭盒子进程
+			e.printStackTrace();
+			this.close();
+		}
+		return mrt.readResponse();
+	}
+
+	// 盒子连接是半双工的需要排队发送数据(MODBUS RTU)
+	public synchronized ModbusResponse sendMessage(ModbusMessage msg, boolean isTCP) throws Exception {
+		if (isTCP) {
+			return sendTCPMessage(msg);
+		}else{
+			return sendRTUMessage(msg);
+		}
 	}
 	
 	private short ack, send, recv;

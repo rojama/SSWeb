@@ -56,6 +56,7 @@ public class PushClient {
                                 os.flush();
                             }
                         } else {
+                            msgList.clear();
                             logger.info("\n\n重新连接中...\n");
                             String push_ip = Machine.getPropertie("api.ip");
                             Integer push_port = Integer.parseInt(Machine.getPropertie("api.port"));

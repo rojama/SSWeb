@@ -247,11 +247,12 @@ public class ElectricPagesBean {
 			List<Map<String, Object>> registers = DB.seleteByColumn("ELE_DEVICE_TYPE_REGISTER", where);			
 			for (Map<String, Object> register : registers) {
 				register.put("REGISTER_VALUE", map.get("REGISTER_VALUE"));
-				if ("MODBUS".equalsIgnoreCase((String)map.get("PROTOCOL_ID"))) {
+				if (((String)map.get("PROTOCOL_ID")).startsWith("MODBUS")) {
+					boolean isTCP = ((String)map.get("PROTOCOL_ID")).endsWith("TCP");
 					if (action.equals("read")){
-						record_data = devicesThread.readMODBUSTCP(register);
+						record_data = devicesThread.readMODBUSTCP(register, isTCP);
 					}else if (action.equals("write")){
-						record_data = devicesThread.writeMODBUSTCP(register);	
+						record_data = devicesThread.writeMODBUSTCP(register, isTCP);
 					}									
 				} else {
 					break;

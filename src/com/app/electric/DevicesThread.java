@@ -113,8 +113,8 @@ public class DevicesThread extends Thread {
 					break;
 				}
 				try {
-					if ("MODBUS".equalsIgnoreCase(protocol_id) && !registers.isEmpty()) {
-						processMODBUSTCP(registers);
+					if (protocol_id.startsWith("MODBUS") && !registers.isEmpty()) {
+						processMODBUSTCP(registers, protocol_id.endsWith("TCP"));
 					} else if ("IEC104".equalsIgnoreCase(protocol_id)) {
 						processIEC104(registers);
 					} else {
@@ -171,14 +171,14 @@ public class DevicesThread extends Thread {
 		}
 	}
 	
-	private void processMODBUSTCP(List<Map<String, Object>> registers) throws Exception{
+	private void processMODBUSTCP(List<Map<String, Object>> registers, boolean isTCP) throws Exception{
 		for (Map<String, Object> register : registers) {
-			String record_data = this.readMODBUSTCP(register);
+			String record_data = this.readMODBUSTCP(register, isTCP);
 			checkWarning(register,record_data);
 		}
 	}
 	
-	public String readMODBUSTCP(Map<String, Object> register) throws Exception{
+	public String readMODBUSTCP(Map<String, Object> register, boolean isTCP) throws Exception{
 		String record_data = "";
 		switch ((Integer) register.get("REGISTER_TYPE")) {
 		case 1:
@@ -186,7 +186,7 @@ public class DevicesThread extends Thread {
 			readCoilsRequest.setUnitID(device_num);
 			readCoilsRequest.setReference((Integer) register.get("REGISTER_ADDRESS"));
 			readCoilsRequest.setBitCount((Integer) register.get("REGISTER_LENGTH"));
-			ReadCoilsResponse readCoilsResponse = (ReadCoilsResponse) processSocketData.sendMessage(readCoilsRequest);
+			ReadCoilsResponse readCoilsResponse = (ReadCoilsResponse) processSocketData.sendMessage(readCoilsRequest, isTCP);
 			BitVector readCoils = readCoilsResponse.getCoils();
 			for (int i=0; i<readCoils.size(); i++){
 				record_data += readCoils.getBit(i) + " ";
@@ -198,7 +198,7 @@ public class DevicesThread extends Thread {
 			readInputDiscretesRequest.setReference((Integer) register.get("REGISTER_ADDRESS"));
 			readInputDiscretesRequest.setBitCount((Integer) register.get("REGISTER_LENGTH"));
 			ReadInputDiscretesResponse readInputDiscretesResponse = (ReadInputDiscretesResponse) processSocketData
-					.sendMessage(readInputDiscretesRequest);
+					.sendMessage(readInputDiscretesRequest, isTCP);
 			BitVector readInputDiscretes = readInputDiscretesResponse.getDiscretes();
 			for (int i=0; i<readInputDiscretes.size(); i++){
 				record_data += readInputDiscretes.getBit(i) + " ";
@@ -210,7 +210,7 @@ public class DevicesThread extends Thread {
 			readMultipleRegistersRequest.setReference((Integer) register.get("REGISTER_ADDRESS"));
 			readMultipleRegistersRequest.setWordCount((Integer) register.get("REGISTER_LENGTH"));
 			ReadMultipleRegistersResponse readMultipleRegistersResponse = (ReadMultipleRegistersResponse) processSocketData
-					.sendMessage(readMultipleRegistersRequest);
+					.sendMessage(readMultipleRegistersRequest, isTCP);
 			Register[] readMultipleRegisters = readMultipleRegistersResponse.getRegisters();
 			for (Register outRegister:readMultipleRegisters){
 				record_data += outRegister.getValue() + " ";
@@ -222,7 +222,7 @@ public class DevicesThread extends Thread {
 			readInputRegistersRequest.setReference((Integer) register.get("REGISTER_ADDRESS"));
 			readInputRegistersRequest.setWordCount((Integer) register.get("REGISTER_LENGTH"));
 			ReadInputRegistersResponse readInputRegistersResponse = (ReadInputRegistersResponse) processSocketData
-					.sendMessage(readInputRegistersRequest);
+					.sendMessage(readInputRegistersRequest, isTCP);
 			InputRegister[] readInputRegisters = readInputRegistersResponse.getRegisters();
 			for (InputRegister outRegister:readInputRegisters){
 				record_data += outRegister.getValue() + " ";
@@ -232,7 +232,7 @@ public class DevicesThread extends Thread {
 		return record_data;
 	}
 
-	public String writeMODBUSTCP(Map<String, Object> register) throws Exception{
+	public String writeMODBUSTCP(Map<String, Object> register, boolean isTCP) throws Exception{
 		String record_data = "";
 		String register_value = (String) register.get("REGISTER_VALUE");
 		switch ((Integer) register.get("REGISTER_TYPE")) {
@@ -241,7 +241,7 @@ public class DevicesThread extends Thread {
 			writeCoilRequest.setUnitID(device_num);
 			writeCoilRequest.setReference((Integer) register.get("REGISTER_ADDRESS"));
 			writeCoilRequest.setCoil(register_value.equalsIgnoreCase("ON"));
-			WriteCoilResponse writeCoilResponse = (WriteCoilResponse) processSocketData.sendMessage(writeCoilRequest);
+			WriteCoilResponse writeCoilResponse = (WriteCoilResponse) processSocketData.sendMessage(writeCoilRequest, isTCP);
 			record_data = writeCoilResponse.getCoil()?"ON":"OFF";
 			break;
 		case 2:
@@ -252,7 +252,7 @@ public class DevicesThread extends Thread {
 			writeSingleRegisterRequest.setReference((Integer) register.get("REGISTER_ADDRESS"));
 			writeSingleRegisterRequest.setRegister(new SimpleRegister(Integer.parseInt(register_value)));
 			WriteSingleRegisterResponse writeSingleRegisterResponse = (WriteSingleRegisterResponse) processSocketData
-					.sendMessage(writeSingleRegisterRequest);
+					.sendMessage(writeSingleRegisterRequest, isTCP);
 			record_data = String.valueOf(writeSingleRegisterResponse.getRegisterValue());
 			break;
 		case 4:

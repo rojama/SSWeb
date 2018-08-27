@@ -58,7 +58,7 @@
 	    		{ display: "设备类型编号",name:"DEVICE_TYPE_ID",type:"text",validate:{required:true}},
 	    		{ display: "设备类型名称",name:"DEVICE_TYPE_NAME",type:"text",validate:{required:true}},
 	    		{ display: "通讯协议",name:"PROTOCOL_ID",type:"select",validate:{required:true},options:{
-					data:[{id:'MODBUS',text:'MODBUS'},{id:'IEC104',text:'IEC104'}]
+					data:[{id:'MODBUS-TCP',text:'MODBUS-TCP'},{id:'MODBUS-RTU',text:'MODBUS-RTU'},{id:'IEC104',text:'IEC104'}]
 				}},
 	    		{ display: "使用预制模板",name:"CUSTOMIZE_TEMPLET",type:"radiolist",validate:{required:true},options:{
 					data:[{id:'true',text:'是'},{id:'false',text:'否'}],
