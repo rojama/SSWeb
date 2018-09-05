@@ -64,7 +64,8 @@ public class DevicesThread extends Thread {
 	//api发送给其它系统
 	public void sendApi(Map<String, Object> data) throws IOException {
 		try {
-			ServerSocketListener.pushClient.sendMessage(makeApiData(data));
+			//ServerSocketListener.pushClient.sendMessage(makeApiData(data));
+			ServerSocketListener.pushServer.sendMessage(makeApiData(data));
 		} catch (Exception e) {
 			e.printStackTrace();
 			if (socket != null) {
