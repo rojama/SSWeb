@@ -140,11 +140,12 @@ public class BoxThread extends Thread {
 		}
 		try {
 			mt.writeMessage(msg);
+			return mt.readResponse();
 		} catch (ModbusIOException e) {  //无法写数据，表示盒子已经断开连接，需要关闭盒子进程
 			e.printStackTrace();
 			this.close();
 		}
-		return mt.readResponse();
+		return null;
 	}
 
 	// 盒子连接是半双工的需要排队发送数据(MODBUS RTU)
@@ -155,11 +156,12 @@ public class BoxThread extends Thread {
 		}
 		try {
 			mrt.writeMessage(msg);
+			return mrt.readResponse();
 		} catch (ModbusIOException e) {  //无法写数据，表示盒子已经断开连接，需要关闭盒子进程
 			e.printStackTrace();
 			this.close();
 		}
-		return mrt.readResponse();
+		return null;
 	}
 
 	// 盒子连接是半双工的需要排队发送数据(MODBUS RTU)

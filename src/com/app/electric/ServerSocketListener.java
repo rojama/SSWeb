@@ -11,7 +11,8 @@ import java.util.List;
 import java.util.Map;
 
 public class ServerSocketListener implements ServletContextListener {
-	public static PushClient pushClient;
+//	public static PushClient pushClient;
+	public static PushServer pushServer;
 	private static Map<Integer, SocketThread> socketThreads;
 	private static int defPort;
 
@@ -47,7 +48,8 @@ public class ServerSocketListener implements ServletContextListener {
 		try {
 			ServletContext servletContext = e.getServletContext();
 			if (socketThreads == null) {
-				pushClient = new PushClient();
+				//pushClient = new PushClient();
+				pushServer = new PushServer();
 				socketThreads = new HashMap<Integer, SocketThread>();
 				defPort = Integer.parseInt(servletContext.getInitParameter("SocketPort"));
 				processBox();
